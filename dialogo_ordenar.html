@@ -1,0 +1,100 @@
+<html>
+<head>
+<meta http-equiv="Cache-control" content="no-cache"> <!-- A: asi se refresca cuando modifico archivo -->
+<!-- VER: https://bootstrap-vue.js.org/docs/components/ -->
+<link type="text/css" rel="stylesheet" href="https://unpkg.com/bootstrap/dist/css/bootstrap.min.css"/>
+<link type="text/css" rel="stylesheet" href="https://unpkg.com/bootstrap-vue@latest/dist/bootstrap-vue.css"/>
+<script src="https://cdn.jsdelivr.net/npm/vue/dist/vue.js"></script>
+<script src="https://unpkg.com/babel-polyfill@latest/dist/polyfill.min.js"></script>
+<script src="https://unpkg.com/bootstrap-vue@latest/dist/bootstrap-vue.js"></script>
+<!-- para traer datos de API y otros sitios VER: https://github.com/axios/axios -->
+<script src="https://unpkg.com/axios/dist/axios.min.js"></script>
+</head>
+<body>
+	<style>
+	.frase {
+		margin: 2px;
+		list-style-type: none;
+	}
+	</style>
+	<div id="app">
+		<b-container>
+			<h2>Tocá las frases en el orden correcto</h2>
+			<ul>
+				<li v-for="(idx,pos) in indicesMezclados" class="frase">
+					- <b-button size="sm" :variant.sync="colorBoton[pos]" @click="onFraseClick(idx[0],pos)"> 
+						{{ frases[idx] }}
+					</b-button>
+				</li>
+			</ul>
+			
+		</b-container>
+	</div>
+
+<script> 
+//S: nuestra app
+frases= [
+	"Hello?",
+	"Hi, Jim from the frontend team here.",
+	"Hi, Jim how can I help you?", 
+	"I need to speak with Laura, is she there?",
+	"I'm affraid she is not here.",
+	"Do you want to leave a message?",
+	"Yes, we need more information about the cart feature, we are blocked.",
+	"I'm sending her a text message to her mobile so she knows you called.",
+	"Thanks, bye.",
+	"Bye.",
+];
+
+function random_int(vmax) { //U: un int al azar menor que vmax
+	return Math.floor(Math.random()*vmax);
+}
+
+function range(vmax) { //U: un array de 0 a vmax
+	var r= new Array(vmax);
+	for (var i=0; i<vmax; i++) { r[i]= i; }
+	return r;
+}
+
+function random_array(elements) { //U: una copia mezclada de elements
+	var x= [].concat(elements); //A: hice una copia para no romper elements
+	var r= new Array(elements.length);	
+	for (var i=0; i<elements.length; i++) {
+		r[i]= x.splice(random_int(x.length),1);
+	}
+	return r;
+}
+
+window.app = new Vue({
+	el: "#app",
+	data: function () {
+		return {
+			frases: frases,
+			indicesMezclados: random_array(range(frases.length)),
+			colorBoton: (new Array(frases.length)).fill("outline-primary"),
+			indice_proximo: 0, //U: el proximo que debe clickear
+		}
+	},
+	methods: {
+		onFraseClick: function (idx,pos) {
+			console.log("CLICK idx, pos, proximo",idx,pos,this.indice_proximo);
+			if (idx== this.indice_proximo) { 
+				let iswap= this.indicesMezclados[this.indice_proximo]; //A: el que voy a mover
+				Vue.set(this.indicesMezclados, this.indice_proximo, idx); //A: movi arriba	
+				Vue.set(this.indicesMezclados, pos, iswap); //A: el de arriba donde estaba este
+				Vue.set(this.colorBoton,this.indice_proximo,"success"); //A: color verde
+				//A: use Vue.set y se actualiza vista
+
+				this.indice_proximo++;
+				console.log("CLICK OK", this.indice_proximo, this.colorBoton); 
+			}
+			else {
+				Vue.set(this.colorBoton,pos,"danger"); //A: vue se entera y actualiza vista
+				setTimeout(() => Vue.set(this.colorBoton,pos,"outline-primary"), 1000);
+			}
+		}
+	}
+});
+</script>
+</body>
+</html>
