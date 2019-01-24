@@ -2,6 +2,7 @@
 <head>
 <meta http-equiv="Cache-control" content="no-cache"> <!-- A: asi se refresca cuando modifico archivo -->
 <!-- VER: https://bootstrap-vue.js.org/docs/components/ -->
+<meta name="viewport" content="width=device-width, initial-scale=1">
 <link type="text/css" rel="stylesheet" href="https://unpkg.com/bootstrap/dist/css/bootstrap.min.css"/>
 <link type="text/css" rel="stylesheet" href="https://unpkg.com/bootstrap-vue@latest/dist/bootstrap-vue.css"/>
 <script src="https://cdn.jsdelivr.net/npm/vue/dist/vue.js"></script>
@@ -12,21 +13,33 @@
 </head>
 <body>
 	<style>
-	.frase {
+	.frases {
+		padding-left: 10px;
+	}
+	
+	li.frase {
 		margin: 2px;
 		list-style-type: none;
 	}
+
+	button.frase {
+		text-align: left;
+	}
+
 	</style>
 	<div id="app">
 		<b-container>
 			<h2>Tocá las frases en el orden correcto</h2>
-			<ul>
+			<ul class="frases">
 				<li v-for="(idx,pos) in indicesMezclados" class="frase">
-					- <b-button size="sm" :variant.sync="colorBoton[pos]" @click="onFraseClick(idx[0],pos)"> 
+					<b-button class="frase" size="sm" :variant.sync="colorBoton[pos]" @click="onFraseClick(idx[0],pos)"> 
 						{{ frases[idx] }}
 					</b-button>
 				</li>
 			</ul>
+			<b-alert :show="estaCompleto" variant="success">
+			Felicitaciones! Completaste este nivel en {{ cuantoTardo }} segundos y te equivocaste {{ cuantasVecesSeEquivoco }} veces.
+			</b-alert>
 			
 		</b-container>
 	</div>
@@ -36,7 +49,7 @@
 frases= [
 	"Hello?",
 	"Hi, Jim from the frontend team here.",
-	"Hi, Jim how can I help you?", 
+	"Hi Jim! How can I help you?", 
 	"I need to speak with Laura, is she there?",
 	"I'm affraid she is not here.",
 	"Do you want to leave a message?",
@@ -73,6 +86,10 @@ window.app = new Vue({
 			indicesMezclados: random_array(range(frases.length)),
 			colorBoton: (new Array(frases.length)).fill("outline-primary"),
 			indice_proximo: 0, //U: el proximo que debe clickear
+			estaCompleto: false, //U: para mostrar el mensaje de felicitaciones
+			cuantoTardo: 0,
+			cuandoEmpezo: new Date(),
+			cuantasVecesSeEquivoco: 0,
 		}
 	},
 	methods: {
@@ -86,9 +103,13 @@ window.app = new Vue({
 				//A: use Vue.set y se actualiza vista
 
 				this.indice_proximo++;
-				console.log("CLICK OK", this.indice_proximo, this.colorBoton); 
+				if (this.indice_proximo==this.frases.length) { //A: completo la ultima
+					this.cuantoTardo= Math.floor((new Date() - this.cuandoEmpezo)/1000);
+					this.estaCompleto= true;
+				}
 			}
 			else {
+				this.cuantasVecesSeEquivoco++;
 				Vue.set(this.colorBoton,pos,"danger"); //A: vue se entera y actualiza vista
 				setTimeout(() => Vue.set(this.colorBoton,pos,"outline-primary"), 1000);
 			}
