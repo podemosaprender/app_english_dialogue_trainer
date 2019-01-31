@@ -2,6 +2,7 @@
 <head>
 <meta http-equiv="Cache-control" content="no-cache"> <!-- A: asi se refresca cuando modifico archivo -->
 <!-- VER: https://bootstrap-vue.js.org/docs/components/ -->
+<meta http-equiv="Content-Security-Policy" content="default-src * 'self' 'unsafe-inline' 'unsafe-eval' https://* http://* file://*; script-src 'self' 'unsafe-inline' 'unsafe-eval' http://* https://* file://*;"><!-- XXX:SEC permitimos eval de JS cargado, por eso HAY QUE CARGAR SOLAMENTE de nuestra app -->
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <link type="text/css" rel="stylesheet" href="https://unpkg.com/bootstrap/dist/css/bootstrap.min.css"/>
 <link type="text/css" rel="stylesheet" href="https://unpkg.com/bootstrap-vue@latest/dist/bootstrap-vue.css"/>
@@ -10,6 +11,8 @@
 <script src="https://unpkg.com/bootstrap-vue@latest/dist/bootstrap-vue.js"></script>
 <!-- para traer datos de API y otros sitios VER: https://github.com/axios/axios -->
 <script src="https://unpkg.com/axios/dist/axios.min.js"></script>
+<script type="text/javascript" src="cordova.js"></script>
+<script src="voice.js"></script>
 </head>
 <body>
 	<style>
@@ -37,6 +40,7 @@
 					</b-button>
 				</li>
 			</ul>
+			<p><b-button size="sm" @click="onReset">Reset</b-button> <b-button size="sm" @click="onListenClick" :variant.sync="colorListen">Listen</b-button> <span>{{ dijo }}</span></p>
 			<b-alert :show="estaCompleto" variant="success">
 			Felicitaciones! Completaste este nivel en {{ cuantoTardo }} segundos y te equivocaste {{ cuantasVecesSeEquivoco }} veces.
 			</b-alert>
@@ -46,12 +50,13 @@
 
 <script> 
 //S: nuestra app
+
 frases= [
 	"Hello?",
 	"Hi, Jim from the frontend team here.",
 	"Hi Jim! How can I help you?", 
 	"I need to speak with Laura, is she there?",
-	"I'm affraid she is not here.",
+	"I'm afraid she's not here.",
 	"Do you want to leave a message?",
 	"Yes, we need more information about the cart feature, we are blocked.",
 	"I'm sending her a text message to her mobile so she knows you called.",
@@ -78,29 +83,86 @@ function random_array(elements) { //U: una copia mezclada de elements
 	return r;
 }
 
+function fraseDist(f1ok, f2listen, dist_max) {
+	dist_max= dist_max || 1;
+	var wordsListen= f2listen.toLowerCase().split(/[^a-z0-9]/i);	
+	var wordsOk= f1ok.toLowerCase().split(/[^a-z0-9]/i);	
+	var f1ok_lc= f1ok.toLowerCase();
+	var cnt= 0; var idx_next=0; //U: proximo indice donde deberia estar la palabra
+	for (var i=0; i<wordsListen.length; i++) {
+		var x= f1ok_lc.indexOf(wordsListen[i],idx_next);
+		if (x>-1 && x-idx_next<dist_max) { //A: esta a menos de dist_max
+			idx_next= x+ wordsListen[i].length; cnt++;
+			console.log("fraseDist hit",wordsListen[i],x,cnt);
+		}
+		else {
+			console.log("fraseDist miss",wordsListen[i],x,cnt);
+		}
+	}
+	return (1-cnt/wordsOk.length);
+}
+
+function fraseNearest(frases,f2listen, word_dist_max, dist_max) {
+	var idx_max=-1; var dist= dist_max;
+	frases.forEach( (f,i) => { 
+		var d= fraseDist(f,f2listen,word_dist_max); 
+		if (d<dist) { dist= d; idx_max=	i } 
+		console.log("fraseNearest",f,i, d, dist, idx_max);
+	});
+	return idx_max;
+}
+
+function initData() {
+	return {
+		frases: frases,
+		indicesMezclados: random_array(range(frases.length)),
+		colorBoton: (new Array(frases.length)).fill("outline-primary"),
+		indice_proximo: 0, //U: el proximo que debe clickear
+		estaCompleto: false, //U: para mostrar el mensaje de felicitaciones
+		cuantoTardo: 0,
+		cuandoEmpezo: new Date(),
+		cuantasVecesSeEquivoco: 0,
+		dijo: '',
+		colorListen: "secondary",
+	}
+}
+
+function rtInit() {
+
+init_voice();
+
 window.app = new Vue({
 	el: "#app",
-	data: function () {
-		return {
-			frases: frases,
-			indicesMezclados: random_array(range(frases.length)),
-			colorBoton: (new Array(frases.length)).fill("outline-primary"),
-			indice_proximo: 0, //U: el proximo que debe clickear
-			estaCompleto: false, //U: para mostrar el mensaje de felicitaciones
-			cuantoTardo: 0,
-			cuandoEmpezo: new Date(),
-			cuantasVecesSeEquivoco: 0,
-		}
-	},
+	data: initData,
 	methods: {
+		onReset: function () {
+			var d= initData();
+			var k; for (k in d) { this[k]= d[k]; }
+		},
+		onListenClick: function() {
+			var my= this;
+			my.colorListen= "primary";
+			window.onListen= function (s) { console.log("DIJO",s);
+				my.colorListen= "secondary";
+				my.dijo= s;
+				if (s!=null) {
+					var idx= fraseNearest(frases,s, 8, .8);
+					if (idx>-1) { //A: encontre una frase
+						my.onFraseClick(idx, my.indicesMezclados.findIndex( e => e[0]==idx)); //A: vue convierte su lista en una cosa rara y hay que desarmarla :(
+					}
+				}
+			}
+			listen();
+		},
 		onFraseClick: function (idx,pos) {
 			console.log("CLICK idx, pos, proximo",idx,pos,this.indice_proximo);
 			if (idx== this.indice_proximo) { 
-				let iswap= this.indicesMezclados[this.indice_proximo]; //A: el que voy a mover
+				var iswap= this.indicesMezclados[this.indice_proximo]; //A: el que voy a mover
 				Vue.set(this.indicesMezclados, this.indice_proximo, idx); //A: movi arriba	
 				Vue.set(this.indicesMezclados, pos, iswap); //A: el de arriba donde estaba este
 				Vue.set(this.colorBoton,this.indice_proximo,"success"); //A: color verde
 				//A: use Vue.set y se actualiza vista
+
 
 				this.indice_proximo++;
 				if (this.indice_proximo==this.frases.length) { //A: completo la ultima
@@ -111,11 +173,17 @@ window.app = new Vue({
 			else {
 				this.cuantasVecesSeEquivoco++;
 				Vue.set(this.colorBoton,pos,"danger"); //A: vue se entera y actualiza vista
-				setTimeout(() => Vue.set(this.colorBoton,pos,"outline-primary"), 1000);
+				setTimeout(function () { Vue.set(this.colorBoton,pos,"outline-primary") }, 1000);
 			}
+
+			speak(frases[idx], function () {});
 		}
 	}
 });
+
+}
+
+document.addEventListener("deviceready", rtInit, false); 
 </script>
 </body>
 </html>
